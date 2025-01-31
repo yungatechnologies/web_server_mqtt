@@ -1,0 +1,102 @@
+version: "3.8"
+services:
+  traefik:
+    image: "traefik:v2.2"
+    container_name: "traefik"
+    command:
+      # - "--api.insecure=true"
+      # - "--api.dashboard=true"
+      # - "--api.debug=true"
+      - "--providers.docker=true"
+      
+        # Entrypoints
+      # - "--entrypoints.web.address=:80"
+      - "--entrypoints.mqtt.address=:1883"
+      
+    ports:
+      # - "80:80"
+      - "1883:1883"
+    networks:
+      - traefik-net
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.http.routers.dashboard.rule=Host(`traefik.yunga-ug.com`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
+    #   - "traefik.http.routers.dashboard.entrypoints=web"
+    #   - "traefik.http.routers.dashboard.service=api@internal"
+
+  yunga:
+    image: node:10-alpine
+    hostname: yunga
+    container_name: yunga
+    command: sh -c "npm i && npm run start"
+    ports:
+      - "3000:3000"
+    working_dir: /app
+    volumes:
+      - ./:/app
+    environment:
+      - PORT:3000
+    depends_on:
+      - mosquitto
+    networks:
+      - yunga-network
+      # - traefik-net
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.port=3000"
+    #   - "traefik.http.routers.web.rule=Host(`web.yunga-ug.com`)"
+    #   - "traefik.http.routers.web.entrypoints=web"
+    #   - "traefik.docker.network=traefik-net"
+
+  #mqtt with mosquitto
+  mosquitto:
+    image: eclipse-mosquitto
+    hostname: mosquitto
+    container_name: mosquitto
+    expose:
+      - "1883"
+      - "9001"
+    volumes:
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-logs:/mosquitto/logs
+      - mosquitto-conf:/mosquitto/config
+    networks:
+      - yunga-network
+      - traefik-net
+
+    labels:
+      - "traefik.enable=true"
+      # - "traefik.http.routers.mqtt.rule=Host(`mqtt.yunga-ug.com`)"
+      # - "traefik.http.routers.mqtt.entrypoints=web"
+      - "traefik.tcp.routers.mqtt.rule=HostSNI(`*`)"
+      - "traefik.tcp.services.mqtt.loadbalancer.server.port=1883"
+      - "traefik.tcp.routers.mqtt.entrypoints=mqtt"
+      - "traefik.http.services.mqtt.loadbalancer.server.port=9001"
+      - "traefik.docker.network=traefik-net"
+
+  #NGINX proxy
+  webserver:
+    image: nginx:mainline-alpine
+    container_name: webserver
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - web-root:/var/www/html
+      - ./nginx-conf:/etc/nginx/conf.d/
+    depends_on:
+      - yunga
+    networks:
+      - yunga-network
+volumes:
+  mosquitto-data:
+  mosquitto-logs:
+  mosquitto-conf:
+  web-root:
+networks:
+  yunga-network:
+    driver: bridge
+  traefik-net:
+    driver: bridge

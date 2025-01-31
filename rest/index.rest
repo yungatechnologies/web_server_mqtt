@@ -1,0 +1,16 @@
+POST http://18.193.168.59/publish
+content-type: application/json
+
+{
+    "message": "{\"message\":\"Hello\"}",
+    "topic":"yunga/test"
+}
+
+###
+POST http://web.yunga-ug.com/publish
+content-type: application/json
+
+{
+    "message": "{\"message\":\"Hello\"}",
+    "topic":"yunga/test"
+}
