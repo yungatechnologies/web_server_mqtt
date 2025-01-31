@@ -1,0 +1,7 @@
+node_modules
+.db
+uploads
+log
+error.log
+.DS_Store
+/public/.DS_Storeservice_account.json
